@@ -90,12 +90,14 @@ class SchemaManager
 
             } else if (isset($fieldMapping['reference']) && isset($fieldMapping['targetDocument'])) {
                 foreach ($indexes as $idx => $index) {
+                    $newKeys = array();
                     foreach ($index['keys'] as $key => $v) {
                         if ($key == $fieldMapping['name']) {
-                            $indexes[$idx]['keys'][$key . '.$id'] = $v;
-                            unset($indexes[$idx]['keys'][$key]);
+                            $key = $key . '.$id';
                         }
+                        $newKeys[$key] = $v;
                     }
+                    $indexes[$idx]['keys'] = $newKeys;
                 }
             }
         }
@@ -106,14 +108,22 @@ class SchemaManager
     {
         $indexes = $class->getIndexes();
         $newIndexes = array();
+
         foreach ($indexes as $index) {
             $newIndex = array(
                 'keys' => array(),
                 'options' => $index['options']
             );
             foreach ($index['keys'] as $key => $value) {
-                $mapping = $class->getFieldMapping($key);
-                $newIndex['keys'][$mapping['name']] = $value;
+                if (isset($class->discriminatorField) && $key === $class->discriminatorField['name']) {
+                    // The discriminator field may have its own mapping
+                    $newIndex['keys'][$class->discriminatorField['fieldName']] = $value;
+                } elseif ($class->hasField($key)) {
+                    $mapping = $class->getFieldMapping($key);
+                    $newIndex['keys'][$mapping['name']] = $value;
+                } else {
+                    $newIndex['keys'][$key] = $value;
+                }
             }
 
             $newIndexes[] = $newIndex;

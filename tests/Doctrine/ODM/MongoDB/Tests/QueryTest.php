@@ -122,6 +122,22 @@ class QueryTest extends BaseTest
         $this->assertEquals(array('testInt' => 0, 'intfields' => array('intone' => 1, 'inttwo' => 2)), $qb->getNewObj());
     }
 
+    public function testElemMatch()
+    {
+        $refId = '000000000000000000000001';
+
+        $qb = $this->dm->createQueryBuilder('Documents\User');
+        $embeddedQb = $this->dm->createQueryBuilder('Documents\Phonenumber');
+
+        $qb->field('phonenumbers')->elemMatch($embeddedQb->expr()
+            ->field('lastCalledBy.id')->equals($refId)
+        );
+        $query = $qb->getQuery();
+
+        $expectedQuery = array('phonenumbers' => array('$elemMatch' => array('lastCalledBy.$id' => new \MongoId($refId))));
+        $this->assertEquals($expectedQuery, $query->debug());
+    }
+
     public function testQueryWithMultipleEmbeddedDocuments()
     {
         $qb = $this->dm->createQueryBuilder(__NAMESPACE__.'\EmbedTest')
