@@ -24,6 +24,7 @@ use Doctrine\MongoDB\EagerCursor as BaseEagerCursor;
 use Doctrine\MongoDB\LoggableCursor as BaseLoggableCursor;
 use Doctrine\ODM\MongoDB\DocumentManager;
 use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
+use Doctrine\ODM\MongoDB\MongoDBException;
 use Doctrine\ODM\MongoDB\EagerCursor;
 use Doctrine\ODM\MongoDB\Cursor;
 use Doctrine\MongoDB\Database;
@@ -71,13 +72,29 @@ class Query extends \Doctrine\MongoDB\Query\Query
      */
     private $refresh = false;
 
-    public function __construct(DocumentManager $dm, ClassMetadata $class, Database $database, Collection $collection, array $query = array(), array $options = array(), $cmd = '$', $hydrate = true, $refresh = false)
+    /**
+     * Array of primer Closure instances.
+     *
+     * @var array
+     */
+    private $primers = array();
+
+    /**
+     * Whether or not to require indexes.
+     *
+     * @var bool
+     */
+    private $requireIndexes;
+
+    public function __construct(DocumentManager $dm, ClassMetadata $class, Database $database, Collection $collection, array $query = array(), array $options = array(), $cmd = '$', $hydrate = true, $refresh = false, array $primers = array(), $requireIndexes = null)
     {
         parent::__construct($database, $collection, $query, $options, $cmd);
-        $this->dm      = $dm;
-        $this->class   = $class;
+        $this->dm = $dm;
+        $this->class = $class;
         $this->hydrate = $hydrate;
         $this->refresh = $refresh;
+        $this->primers = $primers;
+        $this->requireIndexes = $requireIndexes;
     }
 
     /**
@@ -121,6 +138,39 @@ class Query extends \Doctrine\MongoDB\Query\Query
     }
 
     /**
+     * Check if this query is indexed.
+     *
+     * @return bool
+     */
+    public function isIndexed()
+    {
+        $fields = array_unique(array_merge(array_keys($this->query['query']), array_keys($this->query['sort'])));
+        foreach ($fields as $field) {
+            if (!$this->collection->isFieldIndexed($field)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Gets an array of the unindexed fields in this query.
+     *
+     * @return array $unindexedFields
+     */
+    public function getUnindexedFields()
+    {
+        $unindexedFields = array();
+        $fields = array_unique(array_merge(array_keys($this->query['query']), array_keys($this->query['sort'])));
+        foreach ($fields as $field) {
+            if (!$this->collection->isFieldIndexed($field)) {
+                $unindexedFields[] = $field;
+            }
+        }
+        return $unindexedFields;
+    }
+
+    /**
      * Execute the query and returns the results.
      *
      * @return mixed
@@ -128,6 +178,10 @@ class Query extends \Doctrine\MongoDB\Query\Query
     public function execute()
     {
         $uow = $this->dm->getUnitOfWork();
+
+        if ($this->isIndexRequired() && !$this->isIndexed()) {
+            throw MongoDBException::queryNotIndexed($this->class->name, $this->getUnindexedFields());
+        }
 
         $results = parent::execute();
 
@@ -167,6 +221,15 @@ class Query extends \Doctrine\MongoDB\Query\Query
             $results->reset();
         }
 
+        if ($this->primers) {
+            $documentPersister = $this->dm->getUnitOfWork()->getDocumentPersister($this->class->name);
+            foreach ($this->primers as $fieldName => $primer) {
+                if ($primer) {
+                    $documentPersister->primeCollection($results, $fieldName, $primer, $hints);
+                }
+            }
+        }
+
         if ($this->hydrate && is_array($results) && isset($results['_id'])) {
             // Convert a single document array to a document object
             $results = $uow->getOrCreateDocument($this->class->name, $results, $hints);
@@ -175,19 +238,39 @@ class Query extends \Doctrine\MongoDB\Query\Query
         return $results;
     }
 
+    private function isIndexRequired()
+    {
+        if ($this->class->requireIndexes && $this->requireIndexes !== false) {
+            return true;
+        }
+        return $this->requireIndexes !== null ? $this->requireIndexes : false;
+    }
+
     private function wrapCursor(BaseCursor $baseCursor, array $hints)
     {
         if ($baseCursor instanceof BaseLoggableCursor) {
             $cursor = new LoggableCursor(
-                $baseCursor,
+                $this->dm->getConnection(),
+                $this->collection,
                 $this->dm->getUnitOfWork(),
                 $this->class,
-                $baseCursor->getLoggerCallable(),
+                $baseCursor,
                 $baseCursor->getQuery(),
-                $baseCursor->getFields()
+                $baseCursor->getFields(),
+                $this->dm->getConfiguration()->getRetryQuery(),
+                $baseCursor->getLoggerCallable()
             );
         } else {
-            $cursor = new Cursor($baseCursor, $this->dm->getUnitOfWork(), $this->class);
+            $cursor = new Cursor(
+                $this->dm->getConnection(),
+                $this->collection,
+                $this->dm->getUnitOfWork(),
+                $this->class,
+                $baseCursor,
+                $baseCursor->getQuery(),
+                $baseCursor->getFields(),
+                $this->dm->getConfiguration()->getRetryQuery()
+            );
         }
         $cursor->hydrate($this->hydrate);
         $cursor->setHints($hints);

@@ -167,9 +167,19 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     public $distance;
 
     /**
+     * READ-ONLY: Whether or not reads for this class are okay to read from a slave.
+     */
+    public $slaveOkay = false;
+
+    /**
      * READ-ONLY: The array of indexes for the document collection.
      */
     public $indexes = array();
+
+    /**
+     * READ-ONLY: Whether or not queries on this document should require indexes.
+     */
+    public $requireIndexes = false;
 
     /**
      * READ-ONLY: The name of the document class.
@@ -602,6 +612,16 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     }
 
     /**
+     * Sets whether or not reads for this class are okay to read from a slave.
+     *
+     * @param bool $slaveOkay
+     */
+    public function setSlaveOkay($slaveOkay)
+    {
+        $this->slaveOkay = $slaveOkay;
+    }
+
+    /**
      * Add a index for this Document.
      *
      * @param array $keys Array of keys for the index.
@@ -628,6 +648,16 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
             }, $keys),
             'options' => $options
         );
+    }
+
+    /**
+     * Set whether or not queries on this document should require indexes.
+     *
+     * @param bool $requireIndexes
+     */
+    public function setRequireIndexes($requireIndexes)
+    {
+        $this->requireIndexes = $requireIndexes;
     }
 
     /**
@@ -997,9 +1027,11 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
         }
         */
         if (isset($mapping['version'])) {
+            $mapping['notSaved'] = true;
             $this->setVersionMapping($mapping);
         }
         if (isset($mapping['lock'])) {
+            $mapping['notSaved'] = true;
             $this->setLockMapping($mapping);
         }
         $mapping['isOwningSide'] = true;

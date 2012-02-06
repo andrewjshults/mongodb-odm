@@ -1,5 +1,7 @@
 <?php
 /*
+ * THIS SOFTWARE IS PROVIDED BY THE <?php
+/*
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -229,13 +231,19 @@ class UnitOfWork implements PropertyChangedListener
      */
     private $persisters = array();
 
-
     /**
      * The collection persister instance used to persist changes to collections.
      *
      * @var CollectionPersister
      */
     private $collectionPersister;
+
+    /**
+     * The persistence builder instance used in DocumentPersisters.
+     *
+     * @var PersistenceBuilder
+     */
+    private $persistenceBuilder;
 
     /**
      * Array of parent associations between embedded documents
@@ -276,7 +284,10 @@ class UnitOfWork implements PropertyChangedListener
      */
     public function getPersistenceBuilder()
     {
-        return new PersistenceBuilder($this->dm, $this, $this->cmd);
+        if (!$this->persistenceBuilder) {
+            $this->persistenceBuilder = new PersistenceBuilder($this->dm, $this, $this->cmd);
+        }
+        return $this->persistenceBuilder;
     }
 
     /**
@@ -370,6 +381,11 @@ class UnitOfWork implements PropertyChangedListener
      */
     public function commit($document = null, array $options = array())
     {
+        // Raise preFlush
+        if ($this->evm->hasListeners(Events::preFlush)) {
+            $this->evm->dispatchEvent(Events::preFlush, new Event\PreFlushEventArgs($this->dm));
+        }
+
         $defaultOptions = $this->dm->getConfiguration()->getDefaultCommitOptions();
         if ($options) {
             $options = array_merge($defaultOptions, $options);
@@ -448,6 +464,11 @@ class UnitOfWork implements PropertyChangedListener
         // Take new snapshots from visited collections
         foreach ($this->visitedCollections as $coll) {
             $coll->takeSnapshot();
+        }
+
+        // Raise postFlush
+        if ($this->evm->hasListeners(Events::postFlush)) {
+            $this->evm->dispatchEvent(Events::postFlush, new Event\PostFlushEventArgs($this->em));
         }
 
         // Clear up
@@ -559,7 +580,7 @@ class UnitOfWork implements PropertyChangedListener
                 $value = new GridFSFile($value);
                 $class->reflFields[$name]->setValue($document, $value);
                 $actualData[$name] = $value;
-            } elseif (($class->isCollectionValuedReference($name) || $class->isCollectionValuedEmbed($name))
+            } elseif ((isset($mapping['association']) && $mapping['type'] === 'many')
                     && $value !== null && ! ($value instanceof PersistentCollection)) {
                 // If $actualData[$name] is not a Collection then use an ArrayCollection.
                 if ( ! $value instanceof Collection) {
@@ -609,6 +630,11 @@ class UnitOfWork implements PropertyChangedListener
             $class = $this->dm->getClassMetadata(get_class($document));
         }
 
+        // Fire PreFlush lifecycle callbacks
+        if (isset($class->lifecycleCallbacks[Events::preFlush])) {
+            $class->invokeLifecycleCallbacks(Events::preFlush, $document);
+        }
+
         $oid = spl_object_hash($document);
         $actualData = $this->getDocumentActualData($document);
         $isNewDocument = ! isset($this->originalDocumentData[$oid]);
@@ -649,6 +675,10 @@ class UnitOfWork implements PropertyChangedListener
                     }
                 } else if (isset($class->fieldMappings[$propName]['file'])) {
                     if ($orgValue !== $actualValue || $actualValue->isDirty()) {
+                        $changeSet[$propName] = array($orgValue, $actualValue);
+                    }
+                } else if ($orgValue instanceof \DateTime || $actualValue instanceof \DateTime) {
+                    if ($orgValue != $actualValue) {
                         $changeSet[$propName] = array($orgValue, $actualValue);
                     }
                 } else if (is_object($orgValue) && $orgValue !== $actualValue) {
@@ -1175,19 +1205,27 @@ class UnitOfWork implements PropertyChangedListener
         $calc = $this->getCommitOrderCalculator();
 
         // See if there are any new classes in the changeset, that are not in the
-        // commit order graph yet (dontt have a node).
+        // commit order graph yet (dont have a node).
+        // We have to inspect changeSet to be able to correctly build dependencies.
+        // It is not possible to use IdentityMap here because post inserted ids
+        // are not yet available.
         $newNodes = array();
+
         foreach ($documentChangeSet as $oid => $document) {
             $className = get_class($document);
-            if ( ! $calc->hasClass($className)) {
-                $class = $this->dm->getClassMetadata($className);
-                $calc->addClass($class);
-                $newNodes[] = $class;
+
+            if ($calc->hasClass($className)) {
+                continue;
             }
+
+            $class = $this->dm->getClassMetadata($className);
+            $calc->addClass($class);
+
+            $newNodes[] = $class;
         }
 
         // Calculate dependencies for new nodes
-        foreach ($newNodes as $class) {
+        while ($class = array_pop($newNodes)) {
             $this->addDependencies($class, $calc);
         }
         return $calc->getCommitOrder();
@@ -1203,28 +1241,40 @@ class UnitOfWork implements PropertyChangedListener
     private function addDependencies(ClassMetadata $class, $calc)
     {
         foreach ($class->fieldMappings as $mapping) {
-            if ($mapping['isOwningSide'] && isset($mapping['reference']) && isset($mapping['targetDocument'])) {
-                $targetClass = $this->dm->getClassMetadata($mapping['targetDocument']);
-                if ( ! $calc->hasClass($targetClass->name)) {
-                    $calc->addClass($targetClass);
-                }
-                if ( ! $calc->hasDependency($targetClass, $class)) {
-                    $calc->addDependency($targetClass, $class);
-                }
+            $isOwningReference = isset($mapping['reference']) && $mapping['isOwningSide'];
+            $isAssociation = isset($mapping['embedded']) || $isOwningReference;
+            if (!$isAssociation || !isset($mapping['targetDocument'])) {
+                continue;
             }
-            if (isset($mapping['embedded']) && isset($mapping['targetDocument'])) {
-                $targetClass = $this->dm->getClassMetadata($mapping['targetDocument']);
-                if ( ! $calc->hasClass($targetClass->name)) {
-                    $calc->addClass($targetClass);
-                }
-                if ( ! $calc->hasDependency($targetClass, $class)) {
-                    $calc->addDependency($targetClass, $class);
+
+            $targetClass = $this->dm->getClassMetadata($mapping['targetDocument']);
+
+            if ( ! $calc->hasClass($targetClass->name)) {
+                $calc->addClass($targetClass);
+            }
+
+            $calc->addDependency($targetClass, $class);
+
+            // If the target class has mapped subclasses, these share the same dependency.
+            if ( ! $targetClass->subClasses) {
+                continue;
+            }
+
+            foreach ($targetClass->subClasses as $subClassName) {
+                $targetSubClass = $this->dm->getClassMetadata($subClassName);
+
+                if ( ! $calc->hasClass($subClassName)) {
+                    $calc->addClass($targetSubClass);
+
+                    $newNodes[] = $targetSubClass;
                 }
 
-                // avoid infinite recursion
-                if ($class != $targetClass) {
-                    $this->addDependencies($targetClass, $calc);
-                }
+                $calc->addDependency($targetSubClass, $class);
+            }
+
+            // avoid infinite recursion
+            if ($class !== $targetClass) {
+                $this->addDependencies($targetClass, $calc);
             }
         }
     }
@@ -1915,6 +1965,9 @@ class UnitOfWork implements PropertyChangedListener
                         }
 
                         if ( ! $mergeCol instanceof PersistentCollection) {
+                            if ( ! $mergeCol instanceof Collection) {
+                                $mergeCol = new ArrayCollection($mergeCol);
+                            }
                             $mergeCol = new PersistentCollection($mergeCol, $this->dm, $this, $this->cmd);
                             $mergeCol->setInitialized(true);
                         } else {
@@ -2285,25 +2338,43 @@ class UnitOfWork implements PropertyChangedListener
 
     /**
      * Clears the UnitOfWork.
+     *
+     * @param string $documentName if given, only documents of this type will get detached
      */
-    public function clear()
+    public function clear($documentName = null)
     {
-        $this->identityMap =
-        $this->documentIdentifiers =
-        $this->originalDocumentData =
-        $this->documentChangeSets =
-        $this->documentStates =
-        $this->scheduledForDirtyCheck =
-        $this->documentInsertions =
-        $this->documentUpdates =
-        $this->documentDeletions =
-        $this->collectionUpdates =
-        $this->collectionDeletions =
-        $this->extraUpdates =
-        $this->parentAssociations =
-        $this->orphanRemovals = array();
-        if ($this->commitOrderCalculator !== null) {
-            $this->commitOrderCalculator->clear();
+        if ($documentName === null) {
+            $this->identityMap =
+            $this->documentIdentifiers =
+            $this->originalDocumentData =
+            $this->documentChangeSets =
+            $this->documentStates =
+            $this->scheduledForDirtyCheck =
+            $this->documentInsertions =
+            $this->documentUpdates =
+            $this->documentDeletions =
+            $this->collectionUpdates =
+            $this->collectionDeletions =
+            $this->extraUpdates =
+            $this->parentAssociations =
+            $this->orphanRemovals = array();
+
+            if ($this->commitOrderCalculator !== null) {
+                $this->commitOrderCalculator->clear();
+            }
+        } else {
+            $visited = array();
+            foreach ($this->identityMap as $className => $entities) {
+                if ($className === $entityName) {
+                    foreach ($entities as $entity) {
+                        $this->doDetach($entity, $visited, true);
+                    }
+                }
+            }
+        }
+
+        if ($this->evm->hasListeners(Events::onClear)) {
+            $this->evm->dispatchEvent(Events::onClear, new Event\OnClearEventArgs($this->dm, $documentName));
         }
     }
 

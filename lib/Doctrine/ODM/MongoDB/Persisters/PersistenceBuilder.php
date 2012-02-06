@@ -84,10 +84,6 @@ class PersistenceBuilder
             if (isset($mapping['notSaved']) && $mapping['notSaved'] === true) {
                 continue;
             }
-            // Skip version and lock fields
-            if (isset($mapping['version']) || isset($mapping['lock'])) {
-                continue;
-            }
 
             $new = isset($changeset[$mapping['fieldName']][1]) ? $changeset[$mapping['fieldName']][1] : null;
 
@@ -175,11 +171,6 @@ class PersistenceBuilder
 
             // skip not saved fields
             if (isset($mapping['notSaved']) && $mapping['notSaved'] === true) {
-                continue;
-            }
-
-            // Skip version and lock fields
-            if (isset($mapping['version']) || isset($mapping['lock'])) {
                 continue;
             }
 
@@ -271,11 +262,6 @@ class PersistenceBuilder
                 continue;
             }
 
-            // Skip version and lock fields
-            if (isset($mapping['version']) || isset($mapping['lock'])) {
-                continue;
-            }
-
             list($old, $new) = $change;
 
             // @Inc
@@ -332,6 +318,12 @@ class PersistenceBuilder
                 // Do nothing right now
             }
         }
+
+        // add discriminator if the class has one
+        if ($class->hasDiscriminator()) {
+            $updateData[$this->cmd . 'set'][$class->discriminatorField['name']] = $class->discriminatorValue;
+        }
+
         return $updateData;
     }
 

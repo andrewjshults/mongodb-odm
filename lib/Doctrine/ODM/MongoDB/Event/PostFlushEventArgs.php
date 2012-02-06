@@ -1,5 +1,7 @@
 <?php
 /*
+ *  $Id$
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -17,26 +19,44 @@
  * <http://www.doctrine-project.org>.
  */
 
-namespace Doctrine\ODM\MongoDB\Id;
+namespace Doctrine\ODM\MongoDB\Event;
 
 use Doctrine\ODM\MongoDB\DocumentManager;
-use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
+use Doctrine\Common\EventArgs;
 
 /**
- * AbstractIdGenerator
+ * Provides event arguments for the postFlush event.
  *
  * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
- * @since       1.0
+ * @link        www.doctrine-project.org
+ * @since       2.0
+ * @author      Daniel Freudenberger <df@rebuy.de>
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  */
-abstract class AbstractIdGenerator
+class PostFlushEventArgs extends EventArgs
 {
     /**
-     * Generates an identifier for a document.
-     *
-     * @param Doctrine\ODM\MongoDB\DocumentManager $document
-     * @return mixed
+     * @var \Doctrine\ODM\MongoDB\DocumentManager
      */
-    abstract public function generate(DocumentManager $dm, $document);
+    private $dm;
+
+    /**
+     * Constructor.
+     *
+     * @param \Doctrine\ODM\MongoDB\DocumentManager $dm
+     */
+    public function __construct(DocumentManager $dm)
+    {
+        $this->dm = $dm;
+    }
+
+    /**
+     * Retrieve associated DocumentManager.
+     *
+     * @return \Doctrine\ODM\MongoDB\DocumentManager
+     */
+    public function getDocumentManager()
+    {
+        return $this->dm;
+    }
 }

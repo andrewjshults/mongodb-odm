@@ -183,6 +183,12 @@ class AnnotationDriver implements Driver
                 $this->addIndex($class, $index);
             }
         }
+        if (isset($documentAnnot->requireIndexes)) {
+            $class->setRequireIndexes($documentAnnot->requireIndexes);
+        }
+        if (isset($documentAnnot->slaveOkay)) {
+            $class->setSlaveOkay($documentAnnot->slaveOkay);
+        }
 
         foreach ($reflClass->getProperties() as $property) {
             if ($class->isMappedSuperclass && !$property->isPrivate() || $class->isInheritedField($property->name)) {
@@ -250,6 +256,8 @@ class AnnotationDriver implements Driver
                         $class->addLifecycleCallback($method->getName(), Events::preLoad);
                     } elseif ($annot instanceof ODM\PostLoad) {
                         $class->addLifecycleCallback($method->getName(), Events::postLoad);
+                    } elseif ($annot instanceof ODM\PreFlush) {
+                        $class->addLifecycleCallback($method->getName(), Events::preFlush);
                     }
                 }
             }

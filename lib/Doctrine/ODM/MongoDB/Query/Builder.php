@@ -61,6 +61,20 @@ class Builder extends \Doctrine\MongoDB\Query\Builder
      */
     private $refresh = false;
 
+    /**
+     * Array of primer Closure instances.
+     *
+     * @var array
+     */
+    private $primers = array();
+
+    /**
+     * Whether or not to require indexes.
+     *
+     * @var bool
+     */
+    private $requireIndexes;
+
     public function __construct(DocumentManager $dm, $cmd, $documentName = null)
     {
         $this->dm   = $dm;
@@ -69,6 +83,35 @@ class Builder extends \Doctrine\MongoDB\Query\Builder
         if ($documentName !== null) {
             $this->setDocumentName($documentName);
         }
+    }
+
+    /**
+     * Set whether or not to require indexes.
+     *
+     * @param bool $requireIndexes
+     * @return Builder
+     */
+    public function requireIndexes($requireIndexes = true)
+    {
+        $this->requireIndexes = $requireIndexes;
+        return $this;
+    }
+
+    /**
+     * Use a primer to load the current fields referenced data efficiently.
+     *
+     *     $qb->field('user')->prime(true);
+     *     $qb->field('user')->prime(function(DocumentManager $dm) {
+     *         // do something that will prime all the associated users in one query
+     *     });
+     *
+     * @param Closure|boolean $primer
+     * @return Builder
+     */
+    public function prime($primer = true)
+    {
+        $this->primers[$this->currentField] = $primer;
+        return $this;
     }
 
     /**
@@ -189,6 +232,13 @@ class Builder extends \Doctrine\MongoDB\Query\Builder
 
         $query['query'] = $this->expr->getQuery();
         $query['newObj'] = $this->expr->getNewObj();
+        $query['sort'] = $this->dm->getUnitOfWork()
+            ->getDocumentPersister($this->class->name)
+            ->prepareSort($query['sort']);
+
+        if ($this->class->slaveOkay) {
+            $query['slaveOkay'] = $this->class->slaveOkay;
+        }
 
         return new Query(
             $this->dm,
@@ -199,7 +249,9 @@ class Builder extends \Doctrine\MongoDB\Query\Builder
             $options,
             $this->cmd,
             $this->hydrate,
-            $this->refresh
+            $this->refresh,
+            $this->primers,
+            $this->requireIndexes
         );
     }
 
