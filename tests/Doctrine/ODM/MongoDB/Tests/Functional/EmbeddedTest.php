@@ -18,6 +18,23 @@ use Documents\Address,
 
 class EmbeddedTest extends \Doctrine\ODM\MongoDB\Tests\BaseTest
 {
+    public function testSetEmbeddedToNull()
+    {
+        $user = new User();
+        $user->setId((string) new \MongoId());
+        $user->setUsername('jwage');
+        $user->setAddress(null);
+
+        $this->dm->persist($user);
+        $this->dm->flush();
+        $this->dm->clear();
+        $userId = $user->getId();
+
+        $user = $this->dm->getRepository('Documents\User')->find($userId);
+        $this->assertEquals($userId, $user->getId());
+        $this->assertNull($user->getAddress());
+    }
+
     public function testFlushEmbedded()
     {
         $test = new EmbeddedTestLevel0();
@@ -422,5 +439,4 @@ class EmbeddedTest extends \Doctrine\ODM\MongoDB\Tests\BaseTest
             $this->assertNotEmpty($directive->getName());
         }
     }
-
 }
