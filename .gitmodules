@@ -3,7 +3,7 @@
 	url = git://github.com/doctrine/common.git
 [submodule "lib/vendor/doctrine-mongodb"]
 	path = lib/vendor/doctrine-mongodb
-	url = git://github.com/doctrine/mongodb.git
+	url = https://github.com/andrewjshults/mongodb.git
 [submodule "lib/vendor/Symfony/Component/Console"]
 	path = lib/vendor/Symfony/Component/Console
 	url = https://github.com/symfony/Console.git
