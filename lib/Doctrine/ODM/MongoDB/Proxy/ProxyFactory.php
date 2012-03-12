@@ -20,8 +20,7 @@
 namespace Doctrine\ODM\MongoDB\Proxy;
 
 use Doctrine\ODM\MongoDB\DocumentManager,
-    Doctrine\ODM\MongoDB\Mapping\ClassMetadata,
-    Doctrine\Common\Util\ClassUtils;
+    Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
 
 /**
  * This factory is used to create proxy objects for documents at runtime.
@@ -34,6 +33,13 @@ use Doctrine\ODM\MongoDB\DocumentManager,
  */
 class ProxyFactory
 {
+    /**
+     * Marker for Proxy class names.
+     *
+     * @var string
+     */
+    const MARKER = '__CG__';
+
     /** The DocumentManager this factory is bound to. */
     private $dm;
     /** Whether to automatically (re)generate proxy classes. */
@@ -84,7 +90,7 @@ class ProxyFactory
      */
     public function getProxy($className, $identifier)
     {
-        $fqn = ClassUtils::generateProxyClassName($className, $this->proxyNamespace);
+        $fqn = self::generateProxyClassName($className, $this->proxyNamespace);
 
         if (! class_exists($fqn, false)) {
             $fileName = $this->getProxyFileName($className);
@@ -157,7 +163,7 @@ class ProxyFactory
         );
 
         $className = ltrim($class->name, '\\');
-        $proxyClassName = ClassUtils::generateProxyClassName($class->name, $this->proxyNamespace);
+        $proxyClassName = self::generateProxyClassName($class->name, $this->proxyNamespace);
         $parts = explode('\\', strrev($proxyClassName), 2);
         $proxyClassNamespace = strrev($parts[1]);
         $proxyClassName = strrev($parts[0]);
@@ -363,7 +369,7 @@ class <proxyClassName> extends \<className> implements \Doctrine\ODM\MongoDB\Pro
             }
 
             if ($this->__documentPersister__->load($this->__identifier__, $this) === null) {
-                throw \Doctrine\ODM\MongoDB\MongoDBException::documentNotFound(get_class($this), $this->__identifier__);
+                throw \Doctrine\ODM\MongoDB\DocumentNotFoundException::documentNotFound(get_class($this), $this->__identifier__);
             }
             unset($this->__documentPersister__, $this->__identifier__);
         }
@@ -399,4 +405,9 @@ class <proxyClassName> extends \<className> implements \Doctrine\ODM\MongoDB\Pro
         <cloneImpl>
     }
 }';
+
+    public static function generateProxyClassName($className, $proxyNamespace)
+    {
+        return rtrim($proxyNamespace, '\\') . '\\'.self::MARKER.'\\' . ltrim($className, '\\');
+    }
 }
