@@ -17,17 +17,21 @@
  * <http://www.doctrine-project.org>.
  */
 
-namespace Doctrine\ODM\MongoDB\Proxy;
-
-use Doctrine\Common\Persistence\Proxy as BaseProxy;
+namespace Doctrine\ODM\MongoDB;
 
 /**
- * Document Proxy interface.
+ * Class for exception when encountering proxy object that has
+ * an identifier that does not exist in the database.
  *
  * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @since       2.0
+ * @link        www.doctrine-project.org
+ * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
- * @author      Roman Borschel <roman@code-factory.org>
- * @author      Giorgio Sironi <piccoloprincipeazzurro@gmail.com>
  */
-interface Proxy extends BaseProxy {}
+class DocumentNotFoundException extends MongoDBException
+{
+    public static function documentNotFound($className, $identifier)
+    {
+        return new self(sprintf('The "%s" document with identifier "%s" could not be found.', $className, $identifier));
+    }
+}

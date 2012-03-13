@@ -104,7 +104,7 @@ class XmlDriver extends AbstractFileDriver
                 $attributes = $field->attributes();
                 foreach ($attributes as $key => $value) {
                     $mapping[$key] = (string) $value;
-                    $booleanAttributes = array('id', 'reference', 'embed', 'unique', 'file', 'distance');
+                    $booleanAttributes = array('id', 'reference', 'embed', 'unique', 'sparse', 'file', 'distance');
                     if (in_array($key, $booleanAttributes)) {
                         $mapping[$key] = ('true' === $mapping[$key]) ? true : false;
                     }
@@ -173,6 +173,9 @@ class XmlDriver extends AbstractFileDriver
             if (isset($mapping['unique'])) {
                 $options['unique'] = (boolean) $mapping['unique'];
             }
+            if (isset($mapping['sparse'])) {
+                $options['sparse'] = (boolean) $mapping['sparse'];
+            }
             $class->addIndex($keys, $options);
         }
         $class->mapField($mapping);
@@ -216,15 +219,20 @@ class XmlDriver extends AbstractFileDriver
         }
         $attributes = $reference->attributes();
         $mapping = array(
-            'cascade'        => $cascade,
-            'type'           => $type,
-            'reference'      => true,
-            'targetDocument' => isset($attributes['target-document']) ? (string) $attributes['target-document'] : null,
-            'name'           => (string) $attributes['field'],
-            'strategy'       => isset($attributes['strategy']) ? (string) $attributes['strategy'] : 'pushAll',
-            'inversedBy'     => isset($attributes['inversed-by']) ? (string) $attributes['inversed-by'] : null,
-            'mappedBy'       => isset($attributes['mapped-by']) ? (string) $attributes['mapped-by'] : null,
+            'cascade'          => $cascade,
+            'type'             => $type,
+            'reference'        => true,
+            'simple'           => isset($attributes['simple']) ? (boolean) $attributes['simple'] : false,
+            'targetDocument'   => isset($attributes['target-document']) ? (string) $attributes['target-document'] : null,
+            'name'             => (string) $attributes['field'],
+            'strategy'         => isset($attributes['strategy']) ? (string) $attributes['strategy'] : 'pushAll',
+            'inversedBy'       => isset($attributes['inversed-by']) ? (string) $attributes['inversed-by'] : null,
+            'mappedBy'         => isset($attributes['mapped-by']) ? (string) $attributes['mapped-by'] : null,
+            'repositoryMethod' => isset($attributes['repository-method']) ? (string) $attributes['repository-method'] : null,
+            'limit'            => isset($attributes['limit']) ? (integer) $attributes['limit'] : null,
+            'skip'             => isset($attributes['skip']) ? (integer) $attributes['skip'] : null,
         );
+
         if (isset($attributes['fieldName'])) {
             $mapping['fieldName'] = (string) $attributes['fieldName'];
         }
@@ -236,6 +244,18 @@ class XmlDriver extends AbstractFileDriver
             foreach ($reference->{'discriminator-map'}->{'discriminator-mapping'} as $discriminatorMapping) {
                 $attr = $discriminatorMapping->attributes();
                 $mapping['discriminatorMap'][(string) $attr['value']] = (string) $attr['class'];
+            }
+        }
+        if (isset($reference->{'sort'})) {
+            foreach ($reference->{'sort'}->{'sort'} as $sort) {
+                $attr = $sort->attributes();
+                $mapping['sort'][(string) $attr['field']] = isset($attr['order']) ? (string) $attr['order'] : 'asc';
+            }
+        }
+        if (isset($reference->{'criteria'})) {
+            foreach ($reference->{'criteria'}->{'criteria'} as $criteria) {
+                $attr = $criteria->attributes();
+                $mapping['criteria'][(string) $attr['field']] = (string) $attr['value'];
             }
         }
         $this->addFieldMapping($class, $mapping);
@@ -259,6 +279,9 @@ class XmlDriver extends AbstractFileDriver
         }
         if (isset($attributes['unique'])) {
             $options['unique'] = ((string) $attributes['unique'] == 'false') ? false : true;
+        }
+        if (isset($attributes['sparse'])) {
+            $options['sparse'] = ((string) $attributes['sparse'] == 'false') ? false : true;
         }
         $index = array(
             'keys' => array(),
