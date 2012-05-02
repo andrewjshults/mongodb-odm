@@ -579,6 +579,10 @@ class UnitOfWork implements PropertyChangedListener
         $actualData = array();
         foreach ($class->reflFields as $name => $refProp) {
             $mapping = $class->fieldMappings[$name];
+            // skip not saved fields
+            if (isset($mapping['notSaved']) && $mapping['notSaved'] === true) {
+                continue;
+            }
             $value = $refProp->getValue($document);
             if (isset($mapping['file']) && ! $value instanceof GridFSFile) {
                 $value = new GridFSFile($value);
@@ -685,11 +689,7 @@ class UnitOfWork implements PropertyChangedListener
                     if ($orgValue != $actualValue) {
                         $changeSet[$propName] = array($orgValue, $actualValue);
                     }
-                } else if (is_object($orgValue) && $orgValue !== $actualValue) {
-                    $changeSet[$propName] = array($orgValue, $actualValue);
-                } else if (is_array($orgValue) && is_array($actualValue) && ($diff = array_diff($actualValue, $orgValue))) {
-                    $changeSet[$propName] = array($orgValue, $actualValue);
-                } else if ($orgValue != $actualValue || ($orgValue === null ^ $actualValue === null)) {
+                } else if ($orgValue !== $actualValue) {
                     $changeSet[$propName] = array($orgValue, $actualValue);
                 }
             }
@@ -702,6 +702,10 @@ class UnitOfWork implements PropertyChangedListener
 
         // Look for changes in associations of the document
         foreach ($class->fieldMappings as $mapping) {
+            // skip not saved fields
+            if (isset($mapping['notSaved']) && $mapping['notSaved'] === true) {
+                continue;
+            }
             if (isset($mapping['reference']) || isset($mapping['embedded'])) {
                 $value = $class->reflFields[$mapping['fieldName']]->getValue($document);
                 if ($value !== null) {
@@ -867,6 +871,10 @@ class UnitOfWork implements PropertyChangedListener
         $originalData = isset($this->originalDocumentData[$oid]) ? $this->originalDocumentData[$oid] : array();
         $changeSet = array();
         foreach ($actualData as $propName => $actualValue) {
+            // skip not saved fields
+            if (isset($class->fieldMappings[$propName]['notSaved']) && $class->fieldMappings[$propName]['notSaved'] === true) {
+                continue;
+            }
             $orgValue = isset($originalData[$propName]) ? $originalData[$propName] : null;
             if (isset($class->fieldMappings[$propName]['embedded']) && $class->fieldMappings[$propName]['type'] === 'one' && $orgValue !== $actualValue) {
                 if ($orgValue !== null) {
@@ -886,9 +894,7 @@ class UnitOfWork implements PropertyChangedListener
                         $this->visitedCollections[] = $actualValue;
                     }
                 }
-            } else if (is_object($orgValue) && $orgValue !== $actualValue) {
-                $changeSet[$propName] = array($orgValue, $actualValue);
-            } else if ($orgValue != $actualValue || ($orgValue === null ^ $actualValue === null)) {
+            } else if ($orgValue !== $actualValue) {
                 $changeSet[$propName] = array($orgValue, $actualValue);
             }
         }
@@ -2706,11 +2712,11 @@ class UnitOfWork implements PropertyChangedListener
     public function getScheduledCollectionUpdates()
     {
         return $this->collectionUpdates;
-    }
+    }    
 
     /**
      * Helper method to initialize a lazy loading proxy or persistent collection.
-     *
+     * 
      * @param object
      * @return void
      */
