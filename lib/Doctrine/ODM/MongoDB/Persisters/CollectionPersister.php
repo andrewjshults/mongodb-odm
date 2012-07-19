@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -157,15 +157,23 @@ class CollectionPersister
         list($propertyPath, $parent) = $this->getPathAndParent($coll);
         if ($mapping['strategy'] === 'set') {
             $setData = array();
-            foreach ($coll as $key => $document) {
-                if (isset($mapping['reference'])) {
-                    $setData[$key] = $this->pb->prepareReferencedDocumentValue($mapping, $document);
-                } else {
-                    $setData[$key] = $this->pb->prepareEmbeddedDocumentValue($mapping, $document);
+            $insertDiff = $coll->getInsertDiff();
+            if ($insertDiff) {
+                foreach ($insertDiff as $key => $document) {
+                    if (isset($mapping['reference'])) {
+                        $documentUpdates = $this->pb->prepareReferencedDocumentValue($mapping, $document);
+                    } else {
+                        $documentUpdates = $this->pb->prepareEmbeddedDocumentValue($mapping, $document);
+                    }
+
+                    foreach ($documentUpdates as $currFieldName => $currFieldValue) {
+                        $setData[$propertyPath. '.' .$key . '.' . $currFieldName] = $currFieldValue;
+                    }
                 }
+
+                $query = array($this->cmd.'set' => $setData);
+                $this->executeQuery($parent, $query, $options);
             }
-            $query = array($this->cmd.'set' => array($propertyPath => $setData));
-            $this->executeQuery($parent, $query, $options);
         } else {
             $strategy = isset($mapping['strategy']) ? $mapping['strategy'] : 'pushAll';
             $insertDiff = $coll->getInsertDiff();
