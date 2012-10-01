@@ -24,8 +24,6 @@ use Doctrine\Common\Persistence\Mapping\MappingException as BaseMappingException
 /**
  * Class for all exceptions related to the Doctrine MongoDB ODM
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.org
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  */
@@ -99,5 +97,20 @@ class MappingException extends BaseMappingException
     public static function missingIdentifierField($className, $fieldName)
     {
         return new self("The identifier $fieldName is missing for a query of " . $className);
+    }
+    
+    public static function missingIdGeneratorClass($className)
+    {
+        return new self("The class-option for the custom ID generator is missing in class $className.");
+    }
+    
+    public static function classIsNotAValidGenerator($className)
+    {
+        return new self("The class $className if not a valid ID generator of type AbstractIdGenerator.");
+    }
+    
+    public static function missingGeneratorSetter($className, $optionName)
+    {
+        return new self("The class $className is missing a setter for the option $optionName.");
     }
 }

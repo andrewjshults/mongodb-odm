@@ -22,19 +22,17 @@ namespace Doctrine\ODM\MongoDB\Mapping;
 use Doctrine\Common\Persistence\Mapping\AbstractClassMetadataFactory;
 use Doctrine\Common\Persistence\Mapping\ClassMetadata as ClassMetadataInterface;
 use Doctrine\Common\Persistence\Mapping\ReflectionService;
-use Doctrine\ODM\MongoDB\DocumentManager,
-    Doctrine\ODM\MongoDB\Configuration,
-    Doctrine\ODM\MongoDB\Mapping\ClassMetadata,
-    Doctrine\ODM\MongoDB\Mapping\MappingException,
-    Doctrine\ODM\MongoDB\Events;
+use Doctrine\ODM\MongoDB\DocumentManager;
+use Doctrine\ODM\MongoDB\Configuration;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
+use Doctrine\ODM\MongoDB\Mapping\MappingException;
+use Doctrine\ODM\MongoDB\Events;
 
 /**
  * The ClassMetadataFactory is used to create ClassMetadata objects that contain all the
  * metadata mapping informations of a class which describes how a class should be mapped
  * to a document database.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -127,7 +125,7 @@ class ClassMetadataFactory extends AbstractClassMetadataFactory
     /**
      * {@inheritDoc}
      */
-    protected function doLoadMetadata($class, $parent, $rootEntityFound, array $nonSuperclassParents)
+    protected function doLoadMetadata($class, $parent, $rootEntityFound, array $nonSuperclassParents = array())
     {
         /** @var $class ClassMetadata */
         /** @var $parent ClassMetadata */
@@ -242,6 +240,28 @@ class ClassMetadataFactory extends AbstractClassMetadataFactory
                 }
 
                 $class->setIdGenerator($alnumGenerator);
+                break;
+            case ClassMetadata::GENERATOR_TYPE_CUSTOM:
+                if(empty($idGenOptions['class'])) {
+                    throw MappingException::missingIdGeneratorClass($class->name);
+                }
+                
+                $customGenerator = new $idGenOptions['class'];
+                unset($idGenOptions['class']);
+                if(!$customGenerator instanceof \Doctrine\ODM\MongoDB\Id\AbstractIdGenerator) {
+                    throw MappingException::classIsNotAValidGenerator(get_class($customGenerator));
+                }
+                
+                $methods = get_class_methods($customGenerator);
+                foreach($idGenOptions as $name => $value) {
+                    $method = 'set' . ucfirst($name);
+                    if(!in_array($method, $methods)) {
+                        throw MappingException::missingGeneratorSetter(get_class($customGenerator), $name);
+                    }
+                    
+                    $customGenerator->$method($value);
+                }
+                $class->setIdGenerator($customGenerator);
                 break;
             case ClassMetadata::GENERATOR_TYPE_NONE;
                 break;

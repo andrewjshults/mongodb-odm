@@ -19,10 +19,9 @@
 
 namespace Doctrine\ODM\MongoDB\Mapping;
 
-use Doctrine\ODM\MongoDB\Mapping\MappingException,
-    Doctrine\ODM\MongoDB\LockException,
-    Doctrine\ODM\MongoDB\Proxy\Proxy,
-    ReflectionClass;
+use Doctrine\ODM\MongoDB\Mapping\MappingException;
+use Doctrine\ODM\MongoDB\LockException;
+use Doctrine\ODM\MongoDB\Proxy\Proxy;
 
 /**
  * A <tt>ClassMetadata</tt> instance holds all the object-document mapping metadata
@@ -38,8 +37,6 @@ use Doctrine\ODM\MongoDB\Mapping\MappingException,
  *    get the whole class name, namespace inclusive, prepended to every property in
  *    the serialized representation).
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -70,10 +67,20 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     const GENERATOR_TYPE_ALNUM = 4;
 
     /**
+     * CUSTOM means Doctrine expect a class parameter. It will then try to initiate that class
+     * and pass other options to the generator. It will throw an Exception if the class 
+     * does not exist or if an option was passed for that there is not setter in the new
+     * generator class.
+     * 
+     * The class  will have to be a subtype of AbstractIdGenerator.
+     */
+    const GENERATOR_TYPE_CUSTOM = 5;
+
+    /**
      * NONE means Doctrine will not generate any id for us and you are responsible for manually
      * assigning an id.
      */
-    const GENERATOR_TYPE_NONE = 5;
+    const GENERATOR_TYPE_NONE = 6;
 
 
     const REFERENCE_ONE  = 1;
@@ -400,7 +407,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     public function getReflectionClass()
     {
         if ( ! $this->reflClass) {
-            $this->reflClass = new ReflectionClass($this->name);
+            $this->reflClass = new \ReflectionClass($this->name);
         }
         return $this->reflClass;
     }
