@@ -13,21 +13,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Query;
 
-use Doctrine\ODM\MongoDB\DocumentManager,
-    Doctrine\ODM\MongoDB\Hydrator,
-    Doctrine\ODM\MongoDB\Query\Expr,
-    Doctrine\ODM\MongoDB\UnitOfWork;
+use Doctrine\ODM\MongoDB\DocumentManager;
+use Doctrine\ODM\MongoDB\Hydrator;
+use Doctrine\ODM\MongoDB\Query\Expr;
+use Doctrine\ODM\MongoDB\UnitOfWork;
 
 /**
  * Query builder for ODM.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  */
@@ -154,6 +153,12 @@ class Builder extends \Doctrine\MongoDB\Query\Builder
     {
         $this->setDocumentName($documentName);
         return parent::findAndUpdate();
+    }
+
+    public function returnNew($bool = true)
+    {
+        $this->refresh(true);
+        return parent::returnNew($bool);
     }
 
     /**

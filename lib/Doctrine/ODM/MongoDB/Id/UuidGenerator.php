@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -25,8 +25,6 @@ use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
 /**
  * UuidGenerator generates a uuid for the id.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  */
@@ -77,12 +75,8 @@ class UuidGenerator extends AbstractIdGenerator
      */
     public function generate(DocumentManager $dm, $document)
     {
-        if (!$this->salt) {
-            throw new \Exception('Guid Generator requires a salt to be provided.');
-        }
-
         $guid = $this->generateV4();
-        return $this->generateV5($guid, $this->salt);
+        return $this->generateV5($guid, $this->salt ?: php_uname('n'));
     }
 
     /**

@@ -13,43 +13,47 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Mapping\Driver;
 
-use Doctrine\ODM\MongoDB\Mapping\ClassMetadata,
-    Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo,
-    SimpleXmlElement;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
+use Doctrine\Common\Persistence\Mapping\Driver\FileDriver;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo;
 
 /**
  * XmlDriver is a metadata driver that enables mapping through XML files.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.org
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
  */
-class XmlDriver extends AbstractFileDriver
+class XmlDriver extends FileDriver
 {
-    /**
-     * The file extension of mapping documents.
-     *
-     * @var string
-     */
-    protected $fileExtension = '.dcm.xml';
+    const DEFAULT_FILE_EXTENSION = '.dcm.xml';
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function loadMetadataForClass($className, ClassMetadataInfo $class)
+    public function __construct($locator, $fileExtension = self::DEFAULT_FILE_EXTENSION)
     {
+        parent::__construct($locator, $fileExtension);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function loadMetadataForClass($className, ClassMetadata $class)
+    {
+        /* @var $class ClassMetadataInfo */
+        /* @var $xmlRoot SimpleXMLElement */
         $xmlRoot = $this->getElement($className);
         if ( ! $xmlRoot) {
             return;
         }
+
         if ($xmlRoot->getName() == 'document') {
             if (isset($xmlRoot['repository-class'])) {
                 $class->setCustomRepositoryClass((string) $xmlRoot['repository-class']);
@@ -142,7 +146,15 @@ class XmlDriver extends AbstractFileDriver
     private function addFieldMapping(ClassMetadataInfo $class, $mapping)
     {
         $keys = null;
-        $name = isset($mapping['name']) ? $mapping['name'] : $mapping['fieldName'];
+
+        if (isset($mapping['name'])) {
+            $name = $mapping['name'];
+        } elseif (isset($mapping['fieldName'])) {
+            $name = $mapping['fieldName'];
+        } else {
+            throw new \InvalidArgumentException('Cannot infer a MongoDB name from the mapping');
+        }
+
         if (isset($mapping['type']) && $mapping['type'] === 'collection') {
             $mapping['strategy'] = isset($mapping['strategy']) ? $mapping['strategy'] : 'pushAll';
         }
@@ -261,7 +273,7 @@ class XmlDriver extends AbstractFileDriver
         $this->addFieldMapping($class, $mapping);
     }
 
-    private function addIndex(ClassMetadataInfo $class, SimpleXmlElement $xmlIndex)
+    private function addIndex(ClassMetadataInfo $class, \SimpleXmlElement $xmlIndex)
     {
         $attributes = $xmlIndex->attributes();
         $options = array();
@@ -301,6 +313,9 @@ class XmlDriver extends AbstractFileDriver
         $class->addIndex($index['keys'], $index['options']);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     protected function loadMappingFile($file)
     {
         $result = array();

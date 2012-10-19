@@ -13,15 +13,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB;
 
-use Doctrine\ODM\MongoDB\Mapping\Driver\Driver,
-    Doctrine\ODM\MongoDB\Mapping\Driver\PHPDriver,
-    Doctrine\Common\Cache\Cache;
+use Doctrine\Common\Persistence\Mapping\Driver\MappingDriver;
+use Doctrine\ODM\MongoDB\Mapping\Driver\PHPDriver;
+use Doctrine\Common\Cache\Cache;
 
 /**
  * Configuration class for the DocumentManager. When setting up your DocumentManager
@@ -33,8 +33,6 @@ use Doctrine\ODM\MongoDB\Mapping\Driver\Driver,
  *     $config = new Configuration();
  *     $dm = DocumentManager::create(new Connection(), $config);
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -55,7 +53,7 @@ class Configuration extends \Doctrine\MongoDB\Configuration
     /**
      * Resolves a registered namespace alias to the full namespace.
      *
-     * @param string $documentNamespaceAlias 
+     * @param string $documentNamespaceAlias
      * @return string
      * @throws MongoDBException
      */
@@ -66,6 +64,16 @@ class Configuration extends \Doctrine\MongoDB\Configuration
         }
 
         return trim($this->attributes['documentNamespaces'][$documentNamespaceAlias], '\\');
+    }
+
+    /**
+     * Retrieves the list of registered document namespace aliases.
+     *
+     * @return array
+     */
+    public function getDocumentNamespaces()
+    {
+        return $this->attributes['documentNamespaces'];
     }
 
     /**
@@ -82,32 +90,32 @@ class Configuration extends \Doctrine\MongoDB\Configuration
     /**
      * Sets the cache driver implementation that is used for metadata caching.
      *
-     * @param Driver $driverImpl
+     * @param MappingDriver $driverImpl
      * @todo Force parameter to be a Closure to ensure lazy evaluation
      *       (as soon as a metadata cache is in effect, the driver never needs to initialize).
      */
-    public function setMetadataDriverImpl(Driver $driverImpl)
+    public function setMetadataDriverImpl(MappingDriver $driverImpl)
     {
         $this->attributes['metadataDriverImpl'] = $driverImpl;
     }
 
     /**
      * Add a new default annotation driver with a correctly configured annotation reader.
-     * 
+     *
      * @param array $paths
      * @return Mapping\Driver\AnnotationDriver
      */
     public function newDefaultAnnotationDriver($paths = array())
     {
         $reader = new \Doctrine\Common\Annotations\AnnotationReader();
-        
+
         return new \Doctrine\ODM\MongoDB\Mapping\Driver\AnnotationDriver($reader, (array) $paths);
     }
 
     /**
      * Gets the cache driver implementation that is used for the mapping metadata.
      *
-     * @return Mapping\Driver\Driver
+     * @return MappingDriver
      */
     public function getMetadataDriverImpl()
     {
@@ -182,7 +190,7 @@ class Configuration extends \Doctrine\MongoDB\Configuration
 
     /**
      * Gets the namespace where proxy classes reside.
-     * 
+     *
      * @return string
      */
     public function getProxyNamespace()
@@ -193,7 +201,7 @@ class Configuration extends \Doctrine\MongoDB\Configuration
 
     /**
      * Sets the namespace where proxy classes reside.
-     * 
+     *
      * @param string $ns
      */
     public function setProxyNamespace($ns)
@@ -247,7 +255,7 @@ class Configuration extends \Doctrine\MongoDB\Configuration
 
     /**
      * Gets the namespace where hydrator classes reside.
-     * 
+     *
      * @return string
      */
     public function getHydratorNamespace()
@@ -258,7 +266,7 @@ class Configuration extends \Doctrine\MongoDB\Configuration
 
     /**
      * Sets the namespace where hydrator classes reside.
-     * 
+     *
      * @param string $ns
      */
     public function setHydratorNamespace($ns)
@@ -331,5 +339,31 @@ class Configuration extends \Doctrine\MongoDB\Configuration
     public function setDefaultCommitOptions($defaultCommitOptions)
     {
         $this->attributes['defaultCommitOptions'] = $defaultCommitOptions;
+    }
+
+    /**
+     * Add a filter to the list of possible filters.
+     *
+     * @param string $name The name of the filter.
+     * @param string $className The class name of the filter.
+     */
+    public function addFilter($name, $className)
+    {
+        $this->attributes['filters'][$name] = $className;
+    }
+
+    /**
+     * Gets the class name for a given filter name.
+     *
+     * @param string $name The name of the filter.
+     *
+     * @return string The class name of the filter, or null of it is not
+     * defined.
+     */
+    public function getFilterClassName($name)
+    {
+        return isset($this->attributes['filters'][$name])
+            ? $this->attributes['filters'][$name]
+            : null;
     }
 }

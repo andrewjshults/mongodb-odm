@@ -13,16 +13,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Mapping;
 
-use Doctrine\ODM\MongoDB\MongoDBException,
-    Doctrine\ODM\MongoDB\LockException,
-    Doctrine\ODM\MongoDB\Proxy\Proxy,
-    ReflectionClass;
+use Doctrine\ODM\MongoDB\Mapping\MappingException;
+use Doctrine\ODM\MongoDB\LockException;
+use Doctrine\ODM\MongoDB\Proxy\Proxy;
 
 /**
  * A <tt>ClassMetadata</tt> instance holds all the object-document mapping metadata
@@ -38,8 +37,6 @@ use Doctrine\ODM\MongoDB\MongoDBException,
  *    get the whole class name, namespace inclusive, prepended to every property in
  *    the serialized representation).
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -70,10 +67,20 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     const GENERATOR_TYPE_ALNUM = 4;
 
     /**
+     * CUSTOM means Doctrine expect a class parameter. It will then try to initiate that class
+     * and pass other options to the generator. It will throw an Exception if the class 
+     * does not exist or if an option was passed for that there is not setter in the new
+     * generator class.
+     * 
+     * The class  will have to be a subtype of AbstractIdGenerator.
+     */
+    const GENERATOR_TYPE_CUSTOM = 5;
+
+    /**
      * NONE means Doctrine will not generate any id for us and you are responsible for manually
      * assigning an id.
      */
-    const GENERATOR_TYPE_NONE = 5;
+    const GENERATOR_TYPE_NONE = 6;
 
 
     const REFERENCE_ONE  = 1;
@@ -131,7 +138,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     public $db;
 
     /**
-     * READ-ONLY: The name of the monge collection the document is mapped to.
+     * READ-ONLY: The name of the mongo collection the document is mapped to.
      */
     public $collection;
 
@@ -400,7 +407,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     public function getReflectionClass()
     {
         if ( ! $this->reflClass) {
-            $this->reflClass = new ReflectionClass($this->name);
+            $this->reflClass = new \ReflectionClass($this->name);
         }
         return $this->reflClass;
     }
@@ -496,7 +503,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
      * lifecycle callbacks and lifecycle listeners.
      *
      * @param string $event The lifecycle event.
-     * @param Document $document The Document on which the event occured.
+     * @param Document $document The Document on which the event occurred.
      */
     public function invokeLifecycleCallbacks($lifecycleEvent, $document, array $arguments = null)
     {
@@ -568,7 +575,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
             $discriminatorField['name'] = $discriminatorField['fieldName'];
         }
         if (isset($this->fieldMappings[$discriminatorField['name']])) {
-            throw MongoDBException::duplicateFieldMapping($this->name, $discriminatorField['name']);
+            throw MappingException::duplicateFieldMapping($this->name, $discriminatorField['name']);
         }
         $this->discriminatorField = $discriminatorField;
     }
@@ -590,7 +597,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
                 $this->discriminatorValue = $value;
             } else {
                 if ( ! class_exists($className)) {
-                    throw MongoDBException::invalidClassInDiscriminatorMap($className, $this->name);
+                    throw MappingException::invalidClassInDiscriminatorMap($className, $this->name);
                 }
                 if (is_subclass_of($className, $this->name)) {
                     $this->subClasses[] = $className;
@@ -943,16 +950,16 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
             $mapping['fieldName'] = $mapping['name'];
         }
         if ( ! isset($mapping['fieldName'])) {
-            throw MongoDBException::missingFieldName($this->name);
+            throw MappingException::missingFieldName($this->name);
         }
         if ( ! isset($mapping['name'])) {
             $mapping['name'] = $mapping['fieldName'];
         }
         if (isset($this->fieldMappings[$mapping['fieldName']])) {
-            throw MongoDBException::duplicateFieldMapping($this->name, $mapping['fieldName']);
+            throw MappingException::duplicateFieldMapping($this->name, $mapping['fieldName']);
         }
         if ($this->discriminatorField['name'] === $mapping['fieldName']) {
-            throw MongoDBException::duplicateFieldMapping($this->name, $mapping['fieldName']);
+            throw MappingException::duplicateFieldMapping($this->name, $mapping['fieldName']);
         }
         if (isset($mapping['targetDocument']) && strpos($mapping['targetDocument'], '\\') === false && strlen($this->namespace)) {
             $mapping['targetDocument'] = $this->namespace . '\\' . $mapping['targetDocument'];
@@ -987,6 +994,9 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
             }
         }
         unset($mapping['cascade']);
+        if (isset($mapping['type']) && $mapping['type'] === 'file') {
+            $mapping['file'] = true;
+        }
         if (isset($mapping['file']) && $mapping['file'] === true) {
             $this->file = $mapping['fieldName'];
             $mapping['name'] = 'file';
@@ -1289,7 +1299,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
         if ($document instanceof Proxy && !$document->__isInitialized()) {
             return $document->__identifier__;
         }
-        return (string) $this->reflFields[$this->identifier]->getValue($document);
+        return $this->reflFields[$this->identifier]->getValue($document);
     }
 
     /**
@@ -1355,7 +1365,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
     public function getFieldMapping($fieldName)
     {
         if ( ! isset($this->fieldMappings[$fieldName])) {
-            throw MongoDBException::mappingNotFound($this->name, $fieldName);
+            throw MappingException::mappingNotFound($this->name, $fieldName);
         }
         return $this->fieldMappings[$fieldName];
     }
@@ -1382,7 +1392,7 @@ class ClassMetadataInfo implements \Doctrine\Common\Persistence\Mapping\ClassMet
      */
     public function hasDiscriminator()
     {
-        return $this->discriminatorField && $this->discriminatorValue ? true : false;
+        return isset($this->discriminatorField) && isset($this->discriminatorValue) ? true : false;
     }
 
     /**

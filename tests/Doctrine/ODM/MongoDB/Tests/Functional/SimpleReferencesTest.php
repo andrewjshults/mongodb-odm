@@ -53,6 +53,10 @@ class SimpleReferencesTest extends BaseTest
         $qb = $this->dm->createQueryBuilder('Documents\SimpleReferenceUser');
         $qb->field('user')->equals($this->user->getId());
         $this->assertEquals(array('userId' => new \MongoId($this->user->getId())), $qb->getQuery()->debug());
+
+        $qb = $this->dm->createQueryBuilder('Documents\SimpleReferenceUser');
+        $qb->field('user')->in(array($this->user->getId()));
+        $this->assertEquals(array('userId' => array('$in' => array(new \MongoId($this->user->getId())))), $qb->getQuery()->debug());
     }
 
     public function testProxy()
@@ -96,5 +100,19 @@ class SimpleReferencesTest extends BaseTest
         $user = $this->dm->getRepository('Documents\User')->findOneBy(array());
         $test = $user->getSimpleReferenceOneInverse();
         $this->assertEquals('test', $test->getName());
+    }
+
+    public function testQueryForNonIds() {
+        $qb = $this->dm->createQueryBuilder('Documents\SimpleReferenceUser');
+        $qb->field('user')->equals(null);
+        $this->assertEquals(array('userId' => null), $qb->getQueryArray());
+
+        $qb = $this->dm->createQueryBuilder('Documents\SimpleReferenceUser');
+        $qb->field('user')->notEqual(null);
+        $this->assertEquals(array('userId' => array('$ne' => null)), $qb->getQueryArray());
+
+        $qb = $this->dm->createQueryBuilder('Documents\SimpleReferenceUser');
+        $qb->field('user')->exists(true);
+        $this->assertEquals(array('userId' => array('$exists' => true)), $qb->getQueryArray());
     }
 }

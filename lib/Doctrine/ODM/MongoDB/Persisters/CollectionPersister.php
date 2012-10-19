@@ -13,17 +13,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Persisters;
 
-use Doctrine\ODM\MongoDB\PersistentCollection,
-    Doctrine\ODM\MongoDB\DocumentManager,
-    Doctrine\ODM\MongoDB\Persisters\PersistenceBuilder,
-    Doctrine\ODM\MongoDB\UnitOfWork,
-    Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
+use Doctrine\ODM\MongoDB\PersistentCollection;
+use Doctrine\ODM\MongoDB\DocumentManager;
+use Doctrine\ODM\MongoDB\Persisters\PersistenceBuilder;
+use Doctrine\ODM\MongoDB\UnitOfWork;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
 
 /**
  * The CollectionPersister is responsible for persisting collections of embedded documents
@@ -34,8 +34,6 @@ use Doctrine\ODM\MongoDB\PersistentCollection,
  * and new documents added to the PersistentCollection are inserted in the call to
  * CollectionPersister::insertRows().
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Bulat Shakirzyanov <bulat@theopenskyproject.com>
@@ -125,7 +123,9 @@ class CollectionPersister
         if ($deleteDiff) {
             list($propertyPath, $parent) = $this->getPathAndParent($coll);
             $query = array($this->cmd.'unset' => array());
+            $isAssocArray = false;
             foreach ($deleteDiff as $key => $document) {
+                $isAssocArray = !$isAssocArray && !is_int($key);
                 $query[$this->cmd.'unset'][$propertyPath.'.'.$key] = true;
             }
             $this->executeQuery($parent, $query, $options);
@@ -139,7 +139,7 @@ class CollectionPersister
              * http://www.mongodb.org/display/DOCS/Updating#Updating-%24unset
              */
             $mapping = $coll->getMapping();
-            if ($mapping['strategy'] !== 'set') {
+            if ($mapping['strategy'] !== 'set' || !$isAssocArray) {
                 $this->executeQuery($parent, array($this->cmd.'pull' => array($propertyPath => null)), $options);
             }
         }
@@ -157,15 +157,27 @@ class CollectionPersister
         list($propertyPath, $parent) = $this->getPathAndParent($coll);
         if ($mapping['strategy'] === 'set') {
             $setData = array();
-            foreach ($coll as $key => $document) {
-                if (isset($mapping['reference'])) {
-                    $setData[$key] = $this->pb->prepareReferencedDocumentValue($mapping, $document);
-                } else {
-                    $setData[$key] = $this->pb->prepareEmbeddedDocumentValue($mapping, $document);
+            $insertDiff = $coll->getInsertDiff();
+            if ($insertDiff) {
+                foreach ($insertDiff as $key => $document) {
+                    if (isset($mapping['reference'])) {
+                        $documentUpdates = $this->pb->prepareReferencedDocumentValue($mapping, $document);
+                    } else {
+                        $documentUpdates = $this->pb->prepareEmbeddedDocumentValue($mapping, $document);
+                    }
+
+                    if (is_int($key)) {
+                        $setData[$propertyPath][] = $documentUpdates;
+                    } else {
+                        foreach ($documentUpdates as $currFieldName => $currFieldValue) {
+                            $setData[$propertyPath. '.' .$key . '.' . $currFieldName] = $currFieldValue;
+                        }
+                    }
                 }
+
+                $query = array($this->cmd.'set' => $setData);
+                $this->executeQuery($parent, $query, $options);
             }
-            $query = array($this->cmd.'set' => array($propertyPath => $setData));
-            $this->executeQuery($parent, $query, $options);
         } else {
             $strategy = isset($mapping['strategy']) ? $mapping['strategy'] : 'pushAll';
             $insertDiff = $coll->getInsertDiff();

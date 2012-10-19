@@ -13,22 +13,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB;
 
-use Doctrine\ODM\MongoDB\Mapping\ClassMetadata,
-    Doctrine\ODM\MongoDB\Mapping\ClassMetadataFactory,
-    Doctrine\ODM\MongoDB\Mapping\Driver\PHPDriver,
-    Doctrine\MongoDB\Connection,
-    Doctrine\ODM\MongoDB\PersistentCollection,
-    Doctrine\ODM\MongoDB\Proxy\ProxyFactory,
-    Doctrine\Common\Collections\ArrayCollection,
-    Doctrine\Common\EventManager,
-    Doctrine\ODM\MongoDB\Hydrator\HydratorFactory,
-    Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadataFactory;
+use Doctrine\ODM\MongoDB\Mapping\Driver\PHPDriver;
+use Doctrine\MongoDB\Connection;
+use Doctrine\ODM\MongoDB\PersistentCollection;
+use Doctrine\ODM\MongoDB\Proxy\ProxyFactory;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\EventManager;
+use Doctrine\ODM\MongoDB\Hydrator\HydratorFactory;
+use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ODM\MongoDB\Query\FilterCollection;
 
 /**
  * The DocumentManager class is the central access point for managing the
@@ -39,8 +40,6 @@ use Doctrine\ODM\MongoDB\Mapping\ClassMetadata,
  *     $config = new Configuration();
  *     $dm = DocumentManager::create(new Connection(), $config);
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -131,6 +130,14 @@ class DocumentManager implements ObjectManager
      */
     private $cmd;
 
+
+    /**
+     * Collection of query filters.
+     *
+     * @var \Doctrine\ODM\MongoDB\Query\FilterCollection
+     */
+    private $filterCollection;
+
     /**
      * Creates a new Document that operates on the given Mongo connection
      * and uses the given Configuration.
@@ -212,7 +219,7 @@ class DocumentManager implements ObjectManager
 
     /**
      * Gets the PHP Mongo instance that this DocumentManager wraps.
-     * 
+     *
      * @return \Doctrine\MongoDB\Connection
      */
     public function getConnection()
@@ -264,7 +271,7 @@ class DocumentManager implements ObjectManager
     }
 
     /**
-     * Retuns SchemaManager, used to create/drop indexes/collections/databases
+     * Returns SchemaManager, used to create/drop indexes/collections/databases.
      *
      * @return \Doctrine\ODM\MongoDB\SchemaManager
      */
@@ -517,7 +524,7 @@ class DocumentManager implements ObjectManager
      */
     public function flush($document = null, array $options = array())
     {
-        if (null !== $document && !is_object($document)) {
+        if (null !== $document && !is_object($document) && !is_array($document)) {
             throw new \InvalidArgumentException(gettype($document));
         }
         $this->errorIfClosed();
@@ -544,6 +551,7 @@ class DocumentManager implements ObjectManager
         if ($document = $this->unitOfWork->tryGetById($identifier, $class->rootDocumentName)) {
             return $document;
         }
+
         $document = $this->proxyFactory->getProxy($class->name, $identifier);
         $this->unitOfWork->registerManaged($document, $identifier, array());
 
@@ -703,7 +711,7 @@ class DocumentManager implements ObjectManager
             $dbRef[$class->discriminatorField['name']] = $class->discriminatorValue;
         }
 
-        // add a discriminator value if the referenced document is not mapped explicitely to a targetDocument
+        // add a discriminator value if the referenced document is not mapped explicitly to a targetDocument
         if ($referenceMapping && ! isset($referenceMapping['targetDocument'])) {
             $discriminatorField = isset($referenceMapping['discriminatorField']) ? $referenceMapping['discriminatorField'] : '_doctrine_class_name';
             $discriminatorValue = isset($referenceMapping['discriminatorMap']) ? array_search($class->getName(), $referenceMapping['discriminatorMap']) : $class->getName();
@@ -723,5 +731,19 @@ class DocumentManager implements ObjectManager
         if ($this->closed) {
             throw MongoDBException::documentManagerClosed();
         }
+    }
+
+    /**
+     * Gets the filter collection.
+     *
+     * @return \Doctrine\ODM\MongoDB\Query\FilterCollection The active filter collection.
+     */
+    public function getFilterCollection()
+    {
+        if (null === $this->filterCollection) {
+            $this->filterCollection = new FilterCollection($this);
+        }
+
+        return $this->filterCollection;
     }
 }

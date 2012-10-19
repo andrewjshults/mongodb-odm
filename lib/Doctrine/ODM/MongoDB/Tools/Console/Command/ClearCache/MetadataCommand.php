@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -26,9 +26,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Command to clear the metadata cache of the various cache drivers.
  *
- * @license http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link    www.doctrine-project.org
- * @since   2.0
+ * @since   1.0
  * @version $Revision$
  * @author  Benjamin Eberlei <kontakt@beberlei.de>
  * @author  Guilherme Blanco <guilhermeblanco@hotmail.com>
@@ -71,12 +69,10 @@ EOT
 
         $output->write('Clearing ALL Metadata cache entries' . PHP_EOL);
 
-        $cacheIds = $cacheDriver->deleteAll();
+        $success = $cacheDriver->deleteAll();
 
-        if ($cacheIds) {
-            foreach ($cacheIds as $cacheId) {
-                $output->write(' - ' . $cacheId . PHP_EOL);
-            }
+        if ($success) {
+            $output->write('The cache entries were successfully deleted.' . PHP_EOL);
         } else {
             $output->write('No entries to be deleted.' . PHP_EOL);
         }

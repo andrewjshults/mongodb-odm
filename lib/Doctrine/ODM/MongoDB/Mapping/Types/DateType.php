@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -22,8 +22,6 @@ namespace Doctrine\ODM\MongoDB\Mapping\Types;
 /**
  * The String type.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.org
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -40,7 +38,7 @@ class DateType extends Type
         }
         $timestamp = false;
         if ($value instanceof \DateTime) {
-            $timestamp = $value->getTimestamp();
+            $timestamp = $value->format('U');
         } elseif (is_numeric($value)) {
             $timestamp = $value;
         } elseif (is_string($value)) {

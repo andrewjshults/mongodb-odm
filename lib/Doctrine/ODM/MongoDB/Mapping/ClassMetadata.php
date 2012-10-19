@@ -13,14 +13,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Mapping;
 
-use Doctrine\ODM\MongoDB\MongoDBException,
-    Doctrine\ODM\MongoDB\LockException;
+use Doctrine\ODM\MongoDB\LockException;
 
 /**
  * A <tt>ClassMetadata</tt> instance holds all the object-document mapping metadata
@@ -36,8 +35,6 @@ use Doctrine\ODM\MongoDB\MongoDBException,
  *    get the whole class name, namespace inclusive, prepended to every property in
  *    the serialized representation).
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.com
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -157,6 +154,14 @@ class ClassMetadata extends ClassMetadataInfo
             $serialized[] = 'file';
         }
 
+        if ($this->slaveOkay) {
+            $serialized[] = 'slaveOkay';
+        }
+
+        if ($this->distance) {
+            $serialized[] = 'distance';
+        }
+
         return $serialized;
     }
 
@@ -191,6 +196,7 @@ class ClassMetadata extends ClassMetadataInfo
         if ($this->prototype === null) {
             $this->prototype = unserialize(sprintf('O:%d:"%s":0:{}', strlen($this->name), $this->name));
         }
+
         return clone $this->prototype;
     }
 }

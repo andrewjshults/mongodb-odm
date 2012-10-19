@@ -13,14 +13,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Tools;
 
-use Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo,
-    Doctrine\Common\Util\Inflector;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo;
+use Doctrine\Common\Util\Inflector;
 
 /**
  * Generic class used to generate PHP5 document classes from ClassMetadataInfo instances
@@ -35,10 +35,7 @@ use Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo,
  *     $generator->setUpdateDocumentIfExists(true);
  *     $generator->generate($classes, '/path/to/generate/documents');
  *
- * @license http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link    www.doctrine-project.org
- * @since   2.0
- * @version $Revision$
+ * @since   1.0
  * @author  Benjamin Eberlei <kontakt@beberlei.de>
  * @author  Guilherme Blanco <guilhermeblanco@hotmail.com>
  * @author  Jonathan Wage <jonwage@gmail.com>
@@ -109,10 +106,12 @@ public function <methodName>()
  * <description>
  *
  * @param <variableType>$<variableName>
+ * @return <document>
  */
 public function <methodName>(<methodTypeHint>$<variableName>)
 {
 <spaces>$this-><fieldName> = $<variableName>;
+<spaces>return $this;
 }';
 
     private static $addMethodTemplate =
@@ -706,7 +705,8 @@ public function <methodName>()
           '<variableType>'      => $variableType,
           '<variableName>'      => Inflector::camelize($fieldName),
           '<methodName>'        => $methodName,
-          '<fieldName>'         => $fieldName
+          '<fieldName>'         => $fieldName,
+          '<document>'          => $this->getClassName($metadata),
         );
 
         $method = str_replace(

@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -22,8 +22,6 @@ namespace Doctrine\ODM\MongoDB\Mapping\Types;
 /**
  * The Id type.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.org
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
@@ -43,7 +41,7 @@ class IdType extends Type
 
     public function convertToPHPValue($value)
     {
-        return $value !== null ? (string) $value : null;
+        return $value instanceof \MongoId ? (string) $value : $value;
     }
 
     public function closureToMongo()
@@ -53,6 +51,6 @@ class IdType extends Type
 
     public function closureToPHP()
     {
-        return '$return = (string) $value;';
+        return '$return = $value instanceof \MongoId ? (string) $value : $value;';
     }
 }

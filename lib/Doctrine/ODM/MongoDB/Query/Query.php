@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -35,7 +35,6 @@ use Doctrine\ODM\MongoDB\LoggableCursor;
  * ODM Query wraps the raw Doctrine MongoDB queries to add additional functionality
  * and to hydrate the raw arrays of data to Doctrine document objects.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  */
@@ -137,26 +136,15 @@ class Query extends \Doctrine\MongoDB\Query\Query
         $this->refresh = $bool;
     }
 
+    /**
+     * Gets the fields involved in this query.
+     *
+     * @return array $fields An array of fields names used in this query.
+     */
     public function getFieldsInQuery()
     {
-        $fields = array();
-        foreach ($this->query['query'] as $fieldName => $value) {
-            if (is_array($value)) {
-                foreach ($value as $k => $v) {
-                    if ($k === $this->cmd.'elemMatch') {
-                        foreach (array_keys($v) as $field) {
-                            $fields[] = $fieldName.'.'.$field;
-                        }
-                    } else {
-                        $fields[] = $fieldName;
-                    }
-                }
-            } else {
-                $fields[] = $fieldName;
-            }
-        }
-        $fields = array_unique(array_merge($fields, array_keys($this->query['sort'])));
-        return $fields;
+        $extractor = new FieldExtractor($this->query['query'], $this->query['sort'], $this->cmd);
+        return $extractor->getFields();
     }
 
     /**
@@ -205,6 +193,10 @@ class Query extends \Doctrine\MongoDB\Query\Query
             throw MongoDBException::queryNotIndexed($this->class->name, $this->getUnindexedFields());
         }
 
+        $this->query['query'] = array_merge(
+            $this->query['query'], 
+            $this->dm->getFilterCollection()->getFilterCriteria($this->class)
+        );  
         $results = parent::execute();
 
         $hints = array();

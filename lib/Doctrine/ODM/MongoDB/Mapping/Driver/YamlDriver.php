@@ -13,37 +13,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
 namespace Doctrine\ODM\MongoDB\Mapping\Driver;
 
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
+use Doctrine\Common\Persistence\Mapping\Driver\FileDriver;
 use Doctrine\ODM\MongoDB\Mapping\ClassMetadataInfo;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * The YamlDriver reads the mapping metadata from yaml schema files.
  *
- * @license     http://www.opensource.org/licenses/lgpl-license.php LGPL
- * @link        www.doctrine-project.org
  * @since       1.0
  * @author      Jonathan H. Wage <jonwage@gmail.com>
  * @author      Roman Borschel <roman@code-factory.org>
  */
-class YamlDriver extends AbstractFileDriver
+class YamlDriver extends FileDriver
 {
-    /**
-     * The file extension of mapping documents.
-     *
-     * @var string
-     */
-    protected $fileExtension = '.dcm.yml';
+    const DEFAULT_FILE_EXTENSION = '.dcm.yml';
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
      */
-    public function loadMetadataForClass($className, ClassMetadataInfo $class)
+    public function __construct($locator, $fileExtension = self::DEFAULT_FILE_EXTENSION)
     {
+        parent::__construct($locator, $fileExtension);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function loadMetadataForClass($className, ClassMetadata $class)
+    {
+        /* @var $class ClassMetadataInfo */
         $element = $this->getElement($className);
         if ( ! $element) {
             return;
@@ -140,7 +145,15 @@ class YamlDriver extends AbstractFileDriver
     private function addFieldMapping(ClassMetadataInfo $class, $mapping)
     {
         $keys = null;
-        $name = isset($mapping['name']) ? $mapping['name'] : $mapping['fieldName'];
+
+        if (isset($mapping['name'])) {
+            $name = $mapping['name'];
+        } elseif (isset($mapping['fieldName'])) {
+            $name = $mapping['fieldName'];
+        } else {
+            throw new \InvalidArgumentException('Cannot infer a MongoDB name from the mapping');
+        }
+
         if (isset($mapping['index'])) {
             $keys = array(
                 $name => isset($mapping['index']['order']) ? $mapping['index']['order'] : 'asc'
@@ -176,6 +189,9 @@ class YamlDriver extends AbstractFileDriver
             'fieldName'      => $fieldName,
             'strategy'       => isset($embed['strategy']) ? (string) $embed['strategy'] : 'pushAll',
         );
+        if (isset($embed['name'])) {
+            $mapping['name'] = $embed['name'];
+        }
         if (isset($embed['discriminatorField'])) {
             $mapping['discriminatorField'] = $embed['discriminatorField'];
         }
@@ -201,6 +217,9 @@ class YamlDriver extends AbstractFileDriver
             'limit'            => isset($reference['limit']) ? (integer) $reference['limit'] : null,
             'skip'             => isset($reference['skip']) ? (integer) $reference['skip'] : null,
         );
+        if (isset($reference['name'])) {
+            $mapping['name'] = $reference['name'];
+        }
         if (isset($reference['discriminatorField'])) {
             $mapping['discriminatorField'] = $reference['discriminatorField'];
         }
@@ -216,8 +235,11 @@ class YamlDriver extends AbstractFileDriver
         $this->addFieldMapping($class, $mapping);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     protected function loadMappingFile($file)
     {
-        return \Symfony\Component\Yaml\Yaml::parse($file);
+        return Yaml::parse($file);
     }
 }
