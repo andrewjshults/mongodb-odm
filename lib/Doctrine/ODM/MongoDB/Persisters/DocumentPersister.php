@@ -908,17 +908,15 @@ class DocumentPersister
 
             $mapping = $metadata->fieldMappings[$e[0]];
             $e[0] = $mapping['name'];
-            $fieldName = $e[0] . '.' .$e[1];
-            if ($e[1] != '$') {
-                $fieldName = $e[0] . '.' .$e[1];
-                $objectProperty = $e[1];
-                $objectPropertyPrefix = '';
-                $fieldHasCollectionItemPointer = false;
-            } else {
-                $fieldName = $e[0] . '.' .$e[1] . '.' .$e[2];
+            $fieldName = implode('.', $e);
+            if ($e[1] === '$') {
                 $objectProperty = $e[2];
                 $objectPropertyPrefix = $e[1] . '.';
                 $fieldHasCollectionItemPointer = true;
+            } else {
+                $objectProperty = $e[1];
+                $objectPropertyPrefix = '';
+                $fieldHasCollectionItemPointer = false;
             }
 
             if (isset($mapping['targetDocument'])) {
